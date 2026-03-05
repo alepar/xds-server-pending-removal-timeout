@@ -118,6 +118,8 @@ func (x *XDSController) SetClusterConfig(timeoutMs uint, healthChecks bool, opts
 	x.mu.Lock()
 	x.timeoutMs = timeoutMs
 	x.healthChecks = healthChecks
+	x.ignoreHealthOnRemoval = false
+	x.ignoreNewHostsUntilHC = false
 	for _, opt := range opts {
 		opt(x)
 	}

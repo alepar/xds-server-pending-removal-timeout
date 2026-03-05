@@ -78,7 +78,12 @@ func parseClusterHosts(r io.Reader, clusterName string) ([]ClusterHost, error) {
 		switch key {
 		case "health_flags":
 			if value != "" {
-				host.HealthFlags = strings.Split(value, "|")
+				raw := strings.Split(value, "|")
+				for i, f := range raw {
+					f = strings.TrimPrefix(f, "/")
+					raw[i] = strings.ToUpper(f)
+				}
+				host.HealthFlags = raw
 			}
 		case "weight":
 			host.Weight = value
@@ -112,7 +117,7 @@ func (h *ClusterHost) HasFlag(flag string) bool {
 // Envoy reports "healthy" as a flag value when the host is healthy.
 func (h *ClusterHost) IsHealthy() bool {
 	for _, f := range h.HealthFlags {
-		if f != "healthy" && f != "" {
+		if f != "HEALTHY" && f != "" {
 			return false
 		}
 	}

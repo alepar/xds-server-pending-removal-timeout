@@ -27,7 +27,7 @@ func addr(port int) string {
 
 // Scenario0_BaselineWithoutFix: hosts stuck in PENDING_DYNAMIC_REMOVAL forever.
 var Scenario0_BaselineWithoutFix = ScenarioDef{
-	Name:         "0. Baseline without fix",
+	Name:         "0. Baseline (no stabilization timeout)",
 	NumEndpoints: 2,
 	Run: func(ctx context.Context, env *ScenarioEnv) (string, error) {
 		p := env.Ports
@@ -414,7 +414,7 @@ var ScenarioH_AdminFidelity = ScenarioDef{
 			if h == nil {
 				return "", fmt.Errorf("missing host %d", port)
 			}
-			if len(h.HealthFlags) != 0 {
+			if !h.IsHealthy() {
 				return "", fmt.Errorf("healthy host %d has flags: %v", port, h.HealthFlags)
 			}
 		}

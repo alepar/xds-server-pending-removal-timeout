@@ -100,22 +100,20 @@ func main() {
 	log.Println("=== Running Isolated Scenarios ===")
 
 	for _, scenario := range AllIsolatedScenarios() {
-		// Determine cluster config: baseline uses no timeout + ignoreHealthOnRemoval,
+		// Determine cluster config: baseline uses no timeout,
 		// all other scenarios use the stabilization timeout.
 		timeoutMs := uint(5000)
 		healthChecks := true
-		var opts []func(*XDSController)
 
-		if scenario.Name == "0. Baseline without fix" {
+		if scenario.Name == "0. Baseline (no stabilization timeout)" {
 			timeoutMs = 0
-			opts = append(opts, WithIgnoreHealthOnRemoval(true))
 		}
 
 		// Start fresh xDS + envoy for each scenario
 		if err := xds.Start(flagXDSPort); err != nil {
 			log.Fatalf("xds start: %v", err)
 		}
-		xds.SetClusterConfig(timeoutMs, healthChecks, opts...)
+		xds.SetClusterConfig(timeoutMs, healthChecks)
 
 		envoy, err := startEnvoy(flagEnvoy, configPath, flagAdminPort, 99)
 		if err != nil {

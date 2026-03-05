@@ -1,8 +1,14 @@
 envoy-static
+envoy
 xds-server
 xds_e2e
 test-runner
 .beads/
+
+# Runtime output
+test-results.json
+bench-result-*.csv
+bench-result-*.json
 
 # Gas Town (added by gt)
 .runtime/
