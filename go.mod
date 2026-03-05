@@ -1,8 +1,6 @@
-module github.com/envoyproxy/go-control-plane/e2e/stabilization_timeout
+module xds_e2e
 
 go 1.25.7
-
-replace github.com/envoyproxy/go-control-plane => ../../
 
 require (
 	github.com/envoyproxy/go-control-plane v0.14.0

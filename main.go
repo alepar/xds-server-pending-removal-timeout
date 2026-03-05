@@ -13,17 +13,15 @@ import (
 )
 
 var (
-	flagEnvoyWithFix    string
-	flagEnvoyWithoutFix string
-	flagAdminPort       int
-	flagXDSPort         int
-	flagStress          string
-	flagBasePort        int
+	flagEnvoy     string
+	flagAdminPort int
+	flagXDSPort   int
+	flagStress    string
+	flagBasePort  int
 )
 
 func init() {
-	flag.StringVar(&flagEnvoyWithFix, "envoy-with-fix", "./envoy-static-with-fix", "Path to envoy binary with fix")
-	flag.StringVar(&flagEnvoyWithoutFix, "envoy-without-fix", "./envoy-static-without-fix", "Path to envoy binary without fix")
+	flag.StringVar(&flagEnvoy, "envoy", "./envoy-static", "Path to envoy binary")
 	flag.IntVar(&flagAdminPort, "admin-port", 9901, "Envoy admin port")
 	flag.IntVar(&flagXDSPort, "xds-port", 5678, "xDS gRPC port")
 	flag.StringVar(&flagStress, "stress", "none", "Stress test profile: none|medium|large")
@@ -85,17 +83,13 @@ func main() {
 
 	flag.Parse()
 
-	// Validate binaries exist
-	for _, bin := range []string{flagEnvoyWithFix, flagEnvoyWithoutFix} {
-		if _, err := os.Stat(bin); err != nil {
-			log.Fatalf("binary not found: %s", bin)
-		}
+	if _, err := os.Stat(flagEnvoy); err != nil {
+		log.Fatalf("binary not found: %s", flagEnvoy)
 	}
 
-	versionWithFix := getEnvoyVersion(flagEnvoyWithFix)
-	versionWithoutFix := getEnvoyVersion(flagEnvoyWithoutFix)
+	version := getEnvoyVersion(flagEnvoy)
 
-	report := NewReport(versionWithFix, versionWithoutFix)
+	report := NewReport(version)
 	xds := NewXDSController()
 	admin := NewAdminClient(flagAdminPort)
 	backends := NewBackendPool()
@@ -106,23 +100,24 @@ func main() {
 	log.Println("=== Running Isolated Scenarios ===")
 
 	for _, scenario := range AllIsolatedScenarios() {
-		// Determine which binary and config
-		binary := flagEnvoyWithFix
+		// Determine cluster config: baseline uses no timeout + ignoreHealthOnRemoval,
+		// all other scenarios use the stabilization timeout.
 		timeoutMs := uint(5000)
 		healthChecks := true
+		var opts []func(*XDSController)
 
 		if scenario.Name == "0. Baseline without fix" {
-			binary = flagEnvoyWithoutFix
 			timeoutMs = 0
+			opts = append(opts, WithIgnoreHealthOnRemoval(true))
 		}
 
 		// Start fresh xDS + envoy for each scenario
 		if err := xds.Start(flagXDSPort); err != nil {
 			log.Fatalf("xds start: %v", err)
 		}
-		xds.SetClusterConfig(timeoutMs, healthChecks)
+		xds.SetClusterConfig(timeoutMs, healthChecks, opts...)
 
-		envoy, err := startEnvoy(binary, configPath, flagAdminPort, 99)
+		envoy, err := startEnvoy(flagEnvoy, configPath, flagAdminPort, 99)
 		if err != nil {
 			log.Fatalf("envoy start: %v", err)
 		}
@@ -194,7 +189,7 @@ func main() {
 		}
 		xds.SetClusterConfig(3000, true) // 3s timeout for stress
 
-		envoy, err := startEnvoy(flagEnvoyWithFix, configPath, flagAdminPort, 99)
+		envoy, err := startEnvoy(flagEnvoy, configPath, flagAdminPort, 99)
 		if err != nil {
 			log.Fatalf("envoy start: %v", err)
 		}

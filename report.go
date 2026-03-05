@@ -34,15 +34,14 @@ type ScenarioStats struct {
 }
 
 type Report struct {
-	mu              sync.Mutex
-	envoyWithFix    string
-	envoyWithoutFix string
-	isolated        []ScenarioResult
-	stress          []StressResults
+	mu           sync.Mutex
+	envoyVersion string
+	isolated     []ScenarioResult
+	stress       []StressResults
 }
 
-func NewReport(withFix, withoutFix string) *Report {
-	return &Report{envoyWithFix: withFix, envoyWithoutFix: withoutFix}
+func NewReport(version string) *Report {
+	return &Report{envoyVersion: version}
 }
 
 func (r *Report) AddIsolated(result ScenarioResult) {
@@ -60,17 +59,14 @@ func (r *Report) AddStress(results StressResults) {
 func (r *Report) Print() {
 	fmt.Println("=== EDS Stabilization Timeout E2E Test Report ===")
 	fmt.Printf("Date: %s\n", time.Now().UTC().Format("2006-01-02 15:04:05 UTC"))
-	fmt.Printf("Envoy (with fix):    %s\n", r.envoyWithFix)
-	fmt.Printf("Envoy (without fix): %s\n", r.envoyWithoutFix)
+	fmt.Printf("Envoy: %s\n", r.envoyVersion)
 	fmt.Println()
 
 	fmt.Println("--- Isolated Scenarios ---")
-	allPassed := true
 	for _, res := range r.isolated {
 		status := "PASS"
 		if !res.Passed {
 			status = "FAIL"
-			allPassed = false
 		}
 		fmt.Printf("[%s]  %-40s %6dms  %s\n", status, res.Name, res.Duration.Milliseconds(), res.Details)
 		if res.Error != "" {
@@ -87,7 +83,6 @@ func (r *Report) Print() {
 			result := "all passed"
 			if stats.Failed > 0 {
 				result = fmt.Sprintf("%d FAILED", stats.Failed)
-				allPassed = false
 			}
 			fmt.Printf("  %-30s %4d (%4.1f%%)  %s\n", name+":", stats.Run, pct, result)
 		}
@@ -96,7 +91,7 @@ func (r *Report) Print() {
 	}
 
 	fmt.Println()
-	if allPassed {
+	if r.AllPassed() {
 		fmt.Println("=== ALL TESTS PASSED ===")
 	} else {
 		fmt.Println("=== SOME TESTS FAILED ===")
@@ -113,17 +108,15 @@ func countFailed(m map[string]*ScenarioStats) int {
 
 func (r *Report) WriteJSON(path string) error {
 	data := struct {
-		Date            string           `json:"date"`
-		EnvoyWithFix    string           `json:"envoy_with_fix"`
-		EnvoyWithoutFix string           `json:"envoy_without_fix"`
-		Isolated        []ScenarioResult `json:"isolated"`
-		Stress          []StressResults  `json:"stress,omitempty"`
+		Date     string           `json:"date"`
+		Envoy    string           `json:"envoy"`
+		Isolated []ScenarioResult `json:"isolated"`
+		Stress   []StressResults  `json:"stress,omitempty"`
 	}{
-		Date:            time.Now().UTC().Format(time.RFC3339),
-		EnvoyWithFix:    r.envoyWithFix,
-		EnvoyWithoutFix: r.envoyWithoutFix,
-		Isolated:        r.isolated,
-		Stress:          r.stress,
+		Date:     time.Now().UTC().Format(time.RFC3339),
+		Envoy:    r.envoyVersion,
+		Isolated: r.isolated,
+		Stress:   r.stress,
 	}
 	f, err := os.Create(path)
 	if err != nil {

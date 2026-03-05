@@ -13,24 +13,22 @@ import (
 
 // BenchConfig holds CLI flags for the bench subcommand.
 type BenchConfig struct {
-	EnvoyWithFix    string
-	EnvoyWithoutFix string
-	AdminPort       int
-	XDSPort         int
-	BasePort        int
-	QPS             int
-	WarmupDuration  time.Duration
-	TestDuration    time.Duration
-	HealthyCount    int
-	TotalCount      int
+	Envoy          string
+	AdminPort      int
+	XDSPort        int
+	BasePort       int
+	QPS            int
+	WarmupDuration time.Duration
+	TestDuration   time.Duration
+	HealthyCount   int
+	TotalCount     int
 }
 
 func parseBenchFlags(args []string) *BenchConfig {
 	fs := flag.NewFlagSet("bench", flag.ExitOnError)
 	cfg := &BenchConfig{}
 
-	fs.StringVar(&cfg.EnvoyWithFix, "envoy-with-fix", "./envoy-static-with-fix", "Path to envoy binary with fix")
-	fs.StringVar(&cfg.EnvoyWithoutFix, "envoy-without-fix", "./envoy-static-without-fix", "Path to envoy binary without fix")
+	fs.StringVar(&cfg.Envoy, "envoy", "./envoy-static", "Path to envoy binary")
 	fs.IntVar(&cfg.AdminPort, "admin-port", 9901, "Envoy admin port")
 	fs.IntVar(&cfg.XDSPort, "xds-port", 5678, "xDS gRPC port")
 	fs.IntVar(&cfg.BasePort, "base-port", 8081, "Base port for backend pool")
@@ -46,11 +44,8 @@ func parseBenchFlags(args []string) *BenchConfig {
 
 // runBench orchestrates two sequential benchmark runs and compares results.
 func runBench(cfg *BenchConfig) {
-	// Validate binaries
-	for _, bin := range []string{cfg.EnvoyWithFix, cfg.EnvoyWithoutFix} {
-		if _, err := os.Stat(bin); err != nil {
-			log.Fatalf("binary not found: %s", bin)
-		}
+	if _, err := os.Stat(cfg.Envoy); err != nil {
+		log.Fatalf("binary not found: %s", cfg.Envoy)
 	}
 
 	fmt.Println("╔══════════════════════════════════════════════════════════════╗")
@@ -58,21 +53,19 @@ func runBench(cfg *BenchConfig) {
 	fmt.Println("╚══════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
-	// Run 1: Legacy (without fix, ignore_health_on_host_removal=true, timeout=0)
+	// Run 1: Legacy (ignore_health_on_host_removal=true, timeout=0)
 	fmt.Println("━━━ Run 1: Legacy (ignore_health_on_host_removal=true) ━━━")
 	legacyResult := runBenchScenario(cfg, benchScenarioConfig{
 		label:                 "legacy",
-		envoyBinary:           cfg.EnvoyWithoutFix,
 		ignoreHealthOnRemoval: true,
 		timeoutMs:             0,
 	})
 
-	// Run 2: Fixed (with fix, ignore_health_on_host_removal=false, timeout=3s)
+	// Run 2: Fixed (ignore_health_on_host_removal=false, timeout=3s)
 	fmt.Println()
 	fmt.Println("━━━ Run 2: Fixed (stabilization_timeout=3s) ━━━")
 	fixedResult := runBenchScenario(cfg, benchScenarioConfig{
 		label:                 "fixed",
-		envoyBinary:           cfg.EnvoyWithFix,
 		ignoreHealthOnRemoval: false,
 		ignoreNewHostsUntilHC: true,
 		timeoutMs:             3000,
@@ -84,19 +77,17 @@ func runBench(cfg *BenchConfig) {
 }
 
 type benchScenarioConfig struct {
-	label                    string
-	envoyBinary              string
-	ignoreHealthOnRemoval    bool
-	ignoreNewHostsUntilHC    bool
-	timeoutMs                uint
+	label                 string
+	ignoreHealthOnRemoval bool
+	ignoreNewHostsUntilHC bool
+	timeoutMs             uint
 }
 
 type benchResult struct {
-	Label       string
-	Load        *LoadResult
-	SwapTime    time.Time
-	SwapOffset  time.Duration
-	EnvoyBinary string
+	Label      string
+	Load       *LoadResult
+	SwapTime   time.Time
+	SwapOffset time.Duration
 }
 
 func runBenchScenario(cfg *BenchConfig, sc benchScenarioConfig) *benchResult {
@@ -140,7 +131,7 @@ func runBenchScenario(cfg *BenchConfig, sc benchScenarioConfig) *benchResult {
 	}
 
 	// Start Envoy
-	envoy, err := startEnvoy(sc.envoyBinary, configPath, cfg.AdminPort, 99)
+	envoy, err := startEnvoy(cfg.Envoy, configPath, cfg.AdminPort, 99)
 	if err != nil {
 		log.Fatalf("[%s] envoy start: %v", sc.label, err)
 	}
@@ -218,11 +209,10 @@ func runBenchScenario(cfg *BenchConfig, sc benchScenarioConfig) *benchResult {
 	}
 
 	return &benchResult{
-		Label:       sc.label,
-		Load:        loadResult,
-		SwapTime:    swapTime,
-		SwapOffset:  swapOffset,
-		EnvoyBinary: sc.envoyBinary,
+		Label:      sc.label,
+		Load:       loadResult,
+		SwapTime:   swapTime,
+		SwapOffset: swapOffset,
 	}
 }
 
@@ -307,4 +297,3 @@ func fmtDuration(d time.Duration) string {
 	}
 	return fmt.Sprintf("%.3fs", d.Seconds())
 }
-

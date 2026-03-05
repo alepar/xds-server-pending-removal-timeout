@@ -1,4 +1,8 @@
-envoy-static-with-fix
-envoy-static-without-fix
+envoy-static
 xds-server
 test-runner
+
+# Gas Town (added by gt)
+.runtime/
+.claude/commands/
+.logs/
