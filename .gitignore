@@ -1,6 +1,8 @@
 envoy-static
 xds-server
+xds_e2e
 test-runner
+.beads/
 
 # Gas Town (added by gt)
 .runtime/
